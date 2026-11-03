@@ -1,0 +1,40 @@
+<script setup lang="ts">
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
+
+const props = defineProps<{ submission: any; versions: any[]; canEditDraft: boolean; canReview: boolean; canDecide: boolean }>();
+const page = usePage();
+const format = (value: number) => new Intl.NumberFormat('id-ID').format(value);
+const entryModeLabel = (mode: string) => ({ direct: 'Input langsung oleh saksi', coordinator_proxy: 'Input pengganti oleh koordinator', admin_proxy: 'Input pengganti oleh Super Admin' }[mode] ?? mode);
+const review = useForm({ action: 'recommend', notes: '' });
+const decision = useForm({ action: 'approve', reason: '' });
+const submitReview = () => review.post(route('verification.review', props.submission.id), { preserveScroll: true });
+const submitDecision = () => decision.post(route('verification.decision', props.submission.id), { preserveScroll: true });
+const runOcr = (evidenceId: number) => router.post(route('reports.ocr.store', evidenceId), {}, { preserveScroll: true });
+</script>
+
+<template>
+    <Head title="Detail Laporan TPS" />
+    <AuthenticatedLayout>
+        <div class="mx-auto max-w-5xl">
+            <Link :href="route('reports.index', { event: submission.event.id })" class="text-xs text-blue-300">← Semua laporan</Link>
+            <div v-if="page.props.flash.success" class="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm text-emerald-200">{{ page.props.flash.success }}</div>
+            <div class="mt-4 flex flex-wrap items-start justify-between gap-3">
+                <div><p class="text-xs uppercase tracking-wider text-blue-400">{{ submission.event.name }}</p><h1 class="mt-1 text-2xl font-bold text-white">{{ submission.station.code }} · {{ submission.station.village }}</h1><p class="mt-1 text-sm text-slate-400">{{ submission.contest }} · Versi {{ submission.version }}</p></div>
+                <span :class="submission.status === 'draft' ? 'bg-amber-400/10 text-amber-300' : 'bg-emerald-400/10 text-emerald-300'" class="rounded-full px-3 py-1 text-xs font-bold uppercase">{{ submission.status }}</span>
+            </div>
+            <div class="mt-5 grid gap-4 lg:grid-cols-3">
+                <section class="glass-panel rounded-2xl p-5 lg:col-span-2"><h2 class="font-bold text-white">Angka laporan</h2><div class="mt-4 space-y-2"><div v-for="item in submission.items" :key="item.number" class="flex justify-between rounded-xl bg-white/[.03] px-4 py-3 text-sm"><span class="text-slate-300">{{ item.number }} · {{ item.label }}</span><strong class="text-white">{{ format(item.votes) }}</strong></div></div><div class="mt-4 grid grid-cols-3 gap-2 border-t border-white/10 pt-4 text-center"><div><p class="text-[10px] text-slate-500">Sah</p><strong class="text-white">{{ format(submission.totals.valid_votes) }}</strong></div><div><p class="text-[10px] text-slate-500">Tidak sah</p><strong class="text-white">{{ format(submission.totals.invalid_votes) }}</strong></div><div><p class="text-[10px] text-slate-500">Total</p><strong class="text-white">{{ format(submission.totals.total_votes) }}</strong></div></div></section>
+                <section class="glass-panel rounded-2xl p-5"><h2 class="font-bold text-white">Provenance</h2><dl class="mt-4 space-y-3 text-xs"><div><dt class="text-slate-500">Penginput</dt><dd class="mt-1 text-white">{{ submission.submitter }}</dd></div><div><dt class="text-slate-500">Mode</dt><dd class="mt-1 text-white">{{ entryModeLabel(submission.entry_mode) }}</dd></div><div><dt class="text-slate-500">Sumber data</dt><dd class="mt-1 text-white">{{ submission.source_name }}</dd></div><div><dt class="text-slate-500">Metode</dt><dd class="mt-1 text-white">{{ submission.source_method }}</dd></div></dl></section>
+            </div>
+            <section class="glass-panel mt-4 rounded-2xl p-5">
+                <div class="flex justify-between"><h2 class="font-bold text-white">Bukti privat</h2><Link v-if="canEditDraft" :href="route('reports.create', { event: submission.event.id, contest: submission.contest_id, tps: submission.event_tps_id, draft: submission.id })" class="text-xs text-blue-300">Lanjutkan draft →</Link></div>
+                <div class="mt-4 grid gap-3 sm:grid-cols-3"><article v-for="item in submission.evidence" :key="item.id" class="overflow-hidden rounded-xl border border-white/10 bg-white/[.03]"><a :href="route('reports.evidence', item.id)" target="_blank"><img :src="`${route('reports.evidence', item.id)}?variant=preview`" :alt="item.name" class="h-36 w-full object-cover"></a><div class="p-3"><p class="truncate text-xs text-slate-400">{{ item.name }}</p><a :href="route('reports.evidence', item.id)" target="_blank" class="mt-1 inline-block text-[10px] font-semibold text-cyan-300">Buka foto asli →</a><div v-if="item.ocr" class="mt-2 text-[10px]"><p :class="item.ocr.status === 'completed' ? 'text-emerald-300' : item.ocr.status === 'failed' ? 'text-rose-300' : 'text-amber-300'">OCR: {{ item.ocr.status }}<span v-if="item.ocr.confidence !== null"> · {{ Number(item.ocr.confidence).toFixed(1) }}%</span></p><p v-if="item.ocr.numbers.length" class="mt-1 break-words text-slate-400">Angka: {{ item.ocr.numbers.join(', ') }}</p><p v-if="item.ocr.error" class="mt-1 text-rose-300">{{ item.ocr.error }}</p></div><button v-if="canEditDraft && (!item.ocr || item.ocr.status === 'failed')" type="button" class="mt-2 rounded-lg bg-cyan-600 px-3 py-1.5 text-[10px] font-bold text-white" @click="runOcr(item.id)">{{ item.ocr ? 'Coba OCR lagi' : 'Jalankan OCR' }}</button></div></article><p v-if="submission.evidence.length === 0" class="text-sm text-slate-500">Belum ada bukti.</p></div>
+                <p v-if="canEditDraft && submission.evidence.some((item: any) => item.ocr?.status === 'completed')" class="mt-3 text-xs text-cyan-300">Buka “Lanjutkan draft” untuk memakai dan mengonfirmasi saran OCR.</p>
+            </section>
+            <section class="glass-panel mt-4 rounded-2xl p-5"><h2 class="font-bold text-white">Riwayat versi</h2><div class="mt-3 divide-y divide-white/5"><Link v-for="item in versions" :key="item.id" :href="route('reports.show', item.id)" class="flex justify-between py-3 text-xs"><span class="text-white">Versi {{ item.version }} · {{ item.submitter }}</span><span class="text-slate-500">{{ item.status }} · {{ item.created_at }}</span></Link></div></section>
+            <section v-if="canReview" class="glass-panel mt-4 rounded-2xl border border-blue-400/20 p-5"><h2 class="font-bold text-white">Review Koordinator</h2><form class="mt-4 grid gap-3 sm:grid-cols-[1fr_2fr_auto]" @submit.prevent="submitReview"><select v-model="review.action" class="rounded-xl border border-white/10 bg-slate-950/60 px-3 py-3 text-sm text-white"><option value="recommend">Rekomendasikan</option><option value="revision_requested">Minta revisi</option></select><input v-model="review.notes" placeholder="Catatan review" class="rounded-xl border border-white/10 bg-slate-950/60 px-3 py-3 text-sm text-white"><button class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white">Simpan review</button></form></section>
+            <section v-if="canDecide" class="glass-panel mt-4 rounded-2xl border border-emerald-400/20 p-5"><h2 class="font-bold text-white">Keputusan Final Super Admin</h2><form class="mt-4 grid gap-3 sm:grid-cols-[1fr_2fr_auto]" @submit.prevent="submitDecision"><select v-model="decision.action" class="rounded-xl border border-white/10 bg-slate-950/60 px-3 py-3 text-sm text-white"><option value="approve">Approve</option><option value="revision_requested">Minta revisi</option><option value="reject">Reject</option></select><input v-model="decision.reason" placeholder="Alasan wajib untuk revisi/reject" class="rounded-xl border border-white/10 bg-slate-950/60 px-3 py-3 text-sm text-white"><button class="rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950">Simpan keputusan</button></form></section>
+        </div>
+    </AuthenticatedLayout>
+</template>

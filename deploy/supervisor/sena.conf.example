@@ -1,0 +1,25 @@
+[program:sena-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=/usr/bin/php /var/www/sena/current/artisan queue:work redis --queue=default --sleep=1 --tries=3 --timeout=90 --max-time=3600
+directory=/var/www/sena/current
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=www-data
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/var/log/supervisor/sena-worker.log
+stopwaitsecs=120
+
+[program:sena-scheduler]
+command=/usr/bin/php /var/www/sena/current/artisan schedule:work
+directory=/var/www/sena/current
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=www-data
+redirect_stderr=true
+stdout_logfile=/var/log/supervisor/sena-scheduler.log
+stopwaitsecs=30
