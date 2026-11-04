@@ -181,7 +181,9 @@ class ReportController extends Controller
             'versions' => $versions->map(fn (VoteSubmission $item) => [...$this->submissionSummary($item), 'created_at' => $item->created_at->format('d M Y, H:i')]),
             'canEditDraft' => $voteSubmission->status === SubmissionStatus::Draft && $voteSubmission->submitter_id === $request->user()->id,
             'canReview' => $request->user()->hasRole(UserRole::Coordinator) && $voteSubmission->submitter_id !== $request->user()->id && in_array($voteSubmission->status, [SubmissionStatus::Submitted, SubmissionStatus::Recommended], true),
-            'canDecide' => $request->user()->hasRole(UserRole::SuperAdmin) && $voteSubmission->submitter_id !== $request->user()->id && in_array($voteSubmission->status, [SubmissionStatus::Submitted, SubmissionStatus::Recommended], true),
+            'canDecide' => $request->user()->hasRole(UserRole::SuperAdmin)
+                && ($voteSubmission->submitter_id !== $request->user()->id || $voteSubmission->entry_mode === 'admin_proxy')
+                && in_array($voteSubmission->status, [SubmissionStatus::Submitted, SubmissionStatus::Recommended], true),
         ]);
     }
 

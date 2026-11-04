@@ -22,8 +22,8 @@ class DecideSubmission
         if (! $actor->hasRole(UserRole::SuperAdmin)) {
             abort(403);
         }
-        if ($submission->submitter_id === $actor->id) {
-            throw ValidationException::withMessages(['action' => 'Super Admin tidak boleh memutuskan laporan yang diinput sendiri.']);
+        if ($submission->submitter_id === $actor->id && $submission->entry_mode !== 'admin_proxy') {
+            throw ValidationException::withMessages(['action' => 'Super Admin tidak boleh memutuskan laporan yang diinput sendiri kecuali transkrip admin proxy dengan bukti sumber.']);
         }
 
         return DB::transaction(function () use ($actor, $submission, $action, $reason) {
@@ -48,7 +48,7 @@ class DecideSubmission
                 $locked->update(['status' => $action === 'reject' ? SubmissionStatus::Rejected : SubmissionStatus::RevisionRequested]);
             }
             ApprovalAction::query()->create(['vote_submission_id' => $locked->id, 'admin_id' => $actor->id, 'action' => $action, 'reason' => $reason]);
-            $this->audit->handle($actor, 'vote_submission.'.$action, $locked, metadata: ['reason' => $reason]);
+            $this->audit->handle($actor, 'vote_submission.'.$action, $locked, metadata: ['reason' => $reason, 'self_approved_admin_proxy' => $locked->submitter_id === $actor->id && $locked->entry_mode === 'admin_proxy']);
 
             return $locked->fresh();
         }, 3);

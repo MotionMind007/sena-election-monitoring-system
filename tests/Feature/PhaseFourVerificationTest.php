@@ -37,7 +37,7 @@ class PhaseFourVerificationTest extends TestCase
         $this->actingAs($coordinator)->post(route('verification.review', $own), ['action' => 'recommend'])->assertSessionHasErrors('action');
     }
 
-    public function test_only_super_admin_final_approves_and_cannot_approve_own_proxy(): void
+    public function test_only_super_admin_final_approves_and_can_approve_own_admin_proxy_with_audit_flag(): void
     {
         $witness = $this->user('saksi01@electcount.test');
         $coordinator = $this->user('coordinator.jayapura@electcount.test');
@@ -50,7 +50,9 @@ class PhaseFourVerificationTest extends TestCase
         $this->assertDatabaseCount('verified_result_items', 3);
 
         $own = $this->submit($admin, null, ['source_name' => 'Saksi fisik', 'source_method' => 'physical_form']);
-        $this->actingAs($admin)->post(route('verification.decision', $own), ['action' => 'approve'])->assertSessionHasErrors('action');
+        $this->actingAs($admin)->post(route('verification.decision', $own), ['action' => 'approve'])->assertRedirect();
+        $this->assertSame('approved', $own->fresh()->status->value);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'vote_submission.approve']);
     }
 
     public function test_approval_resolves_conflict_and_correction_supersedes_active_result(): void

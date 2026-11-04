@@ -3,7 +3,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
-type Submission = { id: number; event: string; contest: string; tps: string; area: string; submitter: string; status: string; version: number; total: number; own: boolean };
+type Submission = { id: number; event: string; contest: string; tps: string; area: string; submitter: string; status: string; version: number; total: number; own: boolean; can_decide: boolean };
 type PaginationLink = { url: string | null; label: string; active: boolean };
 type PaginatedSubmissions = { data: Submission[]; current_page: number; last_page: number; from: number | null; to: number | null; total: number; links: PaginationLink[] };
 
@@ -12,6 +12,11 @@ const query = ref(props.filters.q);
 const status = ref(props.filters.status);
 const applyFilters = () => router.get(route('verification.index'), { q: query.value || undefined, status: status.value || undefined }, { preserveState: true, preserveScroll: true, replace: true });
 const paginationLabel = (label: string) => label.replace('&laquo;', '').replace('&raquo;', '').replace('Previous', 'Sebelumnya').replace('Next', 'Berikutnya').trim();
+const decide = (item: Submission, action: 'approve' | 'revision_requested' | 'reject') => {
+    const reason = action === 'approve' ? '' : window.prompt(action === 'reject' ? 'Alasan penolakan:' : 'Catatan revisi:');
+    if (reason === null || (action !== 'approve' && ! reason.trim())) return;
+    router.post(route('verification.decision', item.id), { action, reason }, { preserveScroll: true });
+};
 </script>
 
 <template>

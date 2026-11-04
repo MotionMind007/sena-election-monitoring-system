@@ -59,6 +59,9 @@ class VerificationController extends Controller
                 'entry_mode' => $item->entry_mode,
                 'total' => $item->totals->total_votes,
                 'own' => $item->submitter_id === $request->user()->id,
+                'can_decide' => $request->user()->hasRole(UserRole::SuperAdmin)
+                    && ($item->submitter_id !== $request->user()->id || $item->entry_mode === 'admin_proxy')
+                    && in_array($item->status, [SubmissionStatus::Submitted, SubmissionStatus::Recommended], true),
             ]);
 
         return Inertia::render('Verification/Index', [
