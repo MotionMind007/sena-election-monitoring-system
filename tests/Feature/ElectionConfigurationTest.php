@@ -83,6 +83,25 @@ class ElectionConfigurationTest extends TestCase
         $this->assertSame(0, $contest->participants()->where('ballot_number', '2')->firstOrFail()->supportingParties()->count());
     }
 
+    public function test_super_admin_can_correct_or_delete_unused_pilkada_participant(): void
+    {
+        [$admin, $province] = $this->regionFixture();
+        $event = app(CreateElection::class)->handle($admin, ['name' => 'Pilkada Koreksi', 'year' => 2032, 'type' => 'pilkada', 'scope_region_id' => $province->id]);
+        $contest = $event->contests()->firstOrFail();
+        $party = Party::query()->create(['name' => 'Partai Koreksi', 'abbreviation' => 'PK', 'active' => true]);
+        $participant = $contest->participants()->create(['participant_type' => 'pair', 'ballot_number' => '1', 'display_name' => 'Nama Salah', 'display_order' => 1, 'active' => true]);
+
+        $this->actingAs($admin)->post(route('admin.participants.update', $participant), [
+            'ballot_number' => '1', 'display_name' => 'Nama Benar', 'display_order' => 1, 'active' => true, 'supporting_party_ids' => [$party->id],
+        ])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('contest_participants', ['id' => $participant->id, 'display_name' => 'Nama Benar']);
+        $this->assertSame([$party->id], $participant->fresh()->supportingParties()->pluck('parties.id')->all());
+
+        $this->actingAs($admin)->delete(route('admin.participants.destroy', $participant))->assertSessionHasNoErrors();
+        $this->assertDatabaseMissing('contest_participants', ['id' => $participant->id]);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'contest_participant.deleted', 'object_id' => (string) $participant->id]);
+    }
+
     public function test_pileg_party_total_is_direct_party_votes_plus_all_candidate_votes_without_double_counting(): void
     {
         [$admin, $event, $district, $village] = $this->pilegFixture(withPollingStation: true);
@@ -121,6 +140,8 @@ class ElectionConfigurationTest extends TestCase
         $this->assertSame(100, $result['votes']['valid']);
         $this->assertSame(100, $result['candidates'][0]['votes']);
         $this->assertSame(60, $result['legislative_candidates'][0]['votes']);
+        $this->actingAs($admin)->delete(route('admin.participants.destroy', $candidate))->assertSessionHasErrors('participant');
+        $this->assertDatabaseHas('contest_participants', ['id' => $candidate->id]);
     }
 
     public function test_super_admin_deletes_an_event_without_operational_data_and_keeps_master_tps(): void

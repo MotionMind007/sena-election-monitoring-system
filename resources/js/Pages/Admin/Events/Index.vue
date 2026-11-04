@@ -8,7 +8,7 @@ type District = { id: number; name: string; parent_id: number; parent?: { id: nu
 type Party = { id: number; name: string; abbreviation: string; logo_path?: string | null; active: boolean };
 type Dapil = { id: number; name: string; regions: District[] };
 type ElectionParty = { id: number; ballot_number: string; party: Party; electoral_districts: Dapil[] };
-type Participant = { id: number; participant_type: 'pair' | 'party' | 'candidate'; ballot_number: string; display_name: string; display_order: number; active: boolean; photo_path?: string | null; supporting_parties: Party[]; election_party?: ElectionParty | null; electoral_district?: Dapil | null };
+type Participant = { id: number; election_contest_id: number; participant_type: 'pair' | 'party' | 'candidate'; ballot_number: string; display_name: string; display_order: number; active: boolean; photo_path?: string | null; supporting_parties: Party[]; election_party?: ElectionParty | null; electoral_district?: Dapil | null };
 type Contest = { id: number; name: string; type: string; status: string; ballot_schema_version?: string | null; participants: Participant[] };
 type Election = { id: number; name: string; year: number; type: 'pilkada' | 'pileg'; status: string; scope_region: ScopeRegion; contests: Contest[]; electoral_districts: Dapil[]; election_parties: ElectionParty[] };
 
@@ -27,6 +27,8 @@ const makeParticipantForm = (contest: Contest) => useForm({
 const dapilForms = reactive<Record<number, ReturnType<typeof makeDapilForm>>>({});
 const electionPartyForms = reactive<Record<number, ReturnType<typeof makeElectionPartyForm>>>({});
 const participantForms = reactive<Record<number, ReturnType<typeof makeParticipantForm>>>({});
+const editingParticipant = ref<Participant | null>(null);
+const editParticipantForm = useForm({ ballot_number: '', display_name: '', display_order: 1, active: true, photo: null as File | null, supporting_party_ids: [] as number[], election_party_id: '' as number | string, electoral_district_id: '' as number | string });
 
 watch(() => props.events, (events) => {
     for (const event of events) {
@@ -55,6 +57,26 @@ const createElectionParty = (eventId: number) => electionPartyForms[eventId].pos
 const createParticipant = (contestId: number) => participantForms[contestId].post(route('admin.participants.store', contestId), { forceFormData: true, preserveScroll: true, onSuccess: () => participantForms[contestId].reset() });
 const updateEventStatus = (eventId: number) => router.patch(route('admin.events.status', eventId), { status: eventStatusValues.value[eventId] }, { preserveScroll: true });
 const updateContestStatus = (contestId: number) => router.patch(route('admin.contests.update', contestId), { status: contestStatuses.value[contestId] }, { preserveScroll: true });
+const beginEditParticipant = (participant: Participant) => {
+    editingParticipant.value = participant;
+    editParticipantForm.clearErrors();
+    editParticipantForm.ballot_number = participant.ballot_number;
+    editParticipantForm.display_name = participant.display_name;
+    editParticipantForm.display_order = participant.display_order;
+    editParticipantForm.active = participant.active;
+    editParticipantForm.photo = null;
+    editParticipantForm.supporting_party_ids = participant.supporting_parties.map((party) => party.id);
+    editParticipantForm.election_party_id = participant.election_party?.id ?? '';
+    editParticipantForm.electoral_district_id = participant.electoral_district?.id ?? '';
+};
+const updateParticipant = () => {
+    if (! editingParticipant.value) return;
+    editParticipantForm.post(route('admin.participants.update', editingParticipant.value.id), { forceFormData: true, preserveScroll: true, onSuccess: () => editingParticipant.value = null });
+};
+const deleteParticipant = (participant: Participant) => {
+    if (! window.confirm(`Hapus ${participant.participant_type === 'candidate' ? 'caleg' : 'paslon'} \"${participant.display_name}\"?`)) return;
+    router.delete(route('admin.participants.destroy', participant.id), { preserveScroll: true, onSuccess: () => { if (editingParticipant.value?.id === participant.id) editingParticipant.value = null; } });
+};
 const deleteEvent = (event: Election) => {
     if (! window.confirm(`Hapus event \"${event.name}\"? Konfigurasi, penugasan, dan tautan TPS event akan dihapus. Master wilayah dan TPS tetap aman.`)) return;
     router.delete(route('admin.events.destroy', event.id), { preserveScroll: true });
@@ -141,7 +163,15 @@ const setFile = (target: { logo?: File | null; photo?: File | null }, key: 'logo
                     <div v-for="contest in event.contests" :key="contest.id" class="mt-5 border-t border-white/10 pt-5">
                         <div class="flex flex-wrap items-center justify-between gap-3"><div><h3 class="text-sm font-bold text-white">{{ contest.name }}</h3><p class="text-[10px] uppercase tracking-wider text-slate-500">{{ contest.ballot_schema_version }}</p></div><div class="flex gap-2"><select v-model="contestStatuses[contest.id]" class="rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-xs text-white"><option value="draft">draft</option><option value="active">active</option><option value="closed">closed</option></select><button class="rounded-lg bg-slate-700 px-3 py-2 text-xs font-bold text-white" @click="updateContestStatus(contest.id)">Simpan</button></div></div>
 
-                        <div v-if="nonPartyParticipants(contest).length" class="mt-4 grid gap-3 md:grid-cols-2"><div v-for="participant in nonPartyParticipants(contest)" :key="participant.id" class="flex gap-3 rounded-xl border border-white/10 bg-white/[.025] p-3"><div class="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-blue-500/10"><img v-if="participant.photo_path" :src="route('participants.photo', participant.id)" :alt="participant.display_name" class="h-full w-full object-cover object-top"><span v-else class="flex h-full items-center justify-center text-xs font-bold text-blue-300">{{ participant.ballot_number }}</span></div><div class="min-w-0"><p class="text-xs text-slate-500">Nomor {{ participant.ballot_number }}</p><p class="truncate text-sm font-bold text-white">{{ participant.display_name }}</p><p v-if="participant.participant_type === 'candidate'" class="mt-1 text-xs text-cyan-300">{{ participant.election_party?.party.abbreviation }} · {{ participant.electoral_district?.name }}</p><p v-else class="mt-1 text-xs text-slate-400">{{ participant.supporting_parties.length ? participant.supporting_parties.map((party) => party.abbreviation).join(', ') : 'Independen / nonpartai' }}</p></div></div></div>
+                        <div v-if="nonPartyParticipants(contest).length" class="mt-4 grid gap-3 md:grid-cols-2"><div v-for="participant in nonPartyParticipants(contest)" :key="participant.id" class="flex gap-3 rounded-xl border border-white/10 bg-white/[.025] p-3"><div class="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-blue-500/10"><img v-if="participant.photo_path" :src="route('participants.photo', participant.id)" :alt="participant.display_name" class="h-full w-full object-cover object-top"><span v-else class="flex h-full items-center justify-center text-xs font-bold text-blue-300">{{ participant.ballot_number }}</span></div><div class="min-w-0 flex-1"><p class="text-xs text-slate-500">Nomor {{ participant.ballot_number }}</p><p class="truncate text-sm font-bold text-white">{{ participant.display_name }}</p><p v-if="participant.participant_type === 'candidate'" class="mt-1 text-xs text-cyan-300">{{ participant.election_party?.party.abbreviation }} · {{ participant.electoral_district?.name }}</p><p v-else class="mt-1 text-xs text-slate-400">{{ participant.supporting_parties.length ? participant.supporting_parties.map((party) => party.abbreviation).join(', ') : 'Independen / nonpartai' }}</p><div class="mt-3 flex gap-2"><button class="rounded-md bg-blue-500/15 px-2 py-1 text-[10px] font-bold text-blue-200" @click="beginEditParticipant(participant)">Edit</button><button class="rounded-md bg-rose-500/10 px-2 py-1 text-[10px] font-bold text-rose-200" @click="deleteParticipant(participant)">Hapus</button></div></div></div></div>
+
+                        <form v-if="editingParticipant && editingParticipant.election_contest_id === contest.id" class="mt-4 rounded-xl border border-blue-400/30 bg-blue-500/[.05] p-4" @submit.prevent="updateParticipant">
+                            <div class="flex items-center justify-between gap-3"><h4 class="text-xs font-bold text-blue-100">Edit {{ editingParticipant.participant_type === 'candidate' ? 'caleg' : 'paslon' }}</h4><button type="button" class="text-xs text-slate-400" @click="editingParticipant = null">Batal</button></div>
+                            <div class="mt-3 grid gap-2 md:grid-cols-[90px_1fr_80px_1fr]"><label class="text-[10px] text-slate-500">Nomor urut<input v-model="editParticipantForm.ballot_number" required class="mt-1 w-full rounded-lg border border-white/10 bg-slate-950/60 px-2 py-2 text-xs text-white"></label><label class="text-[10px] text-slate-500">Nama<input v-model="editParticipantForm.display_name" required class="mt-1 w-full rounded-lg border border-white/10 bg-slate-950/60 px-2 py-2 text-xs text-white"></label><label class="text-[10px] text-slate-500">Urutan<input v-model.number="editParticipantForm.display_order" required type="number" min="1" class="mt-1 w-full rounded-lg border border-white/10 bg-slate-950/60 px-2 py-2 text-xs text-white"></label><label class="text-[10px] text-slate-500">Ganti foto<input type="file" accept="image/jpeg,image/png,image/webp" class="mt-1 block w-full text-[10px] text-slate-400" @change="setFile(editParticipantForm, 'photo', $event)"></label></div>
+                            <div v-if="event.type === 'pileg'" class="mt-3 grid gap-2 md:grid-cols-2"><label class="text-[10px] text-slate-500">Dapil<select v-model="editParticipantForm.electoral_district_id" required class="mt-1 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-xs text-white"><option v-for="dapil in event.electoral_districts" :key="dapil.id" :value="dapil.id">{{ dapil.name }}</option></select></label><label class="text-[10px] text-slate-500">Partai<select v-model="editParticipantForm.election_party_id" required class="mt-1 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-xs text-white"><option v-for="entry in partyOptionsForDapil(event, editParticipantForm.electoral_district_id)" :key="entry.id" :value="entry.id">{{ entry.ballot_number }} · {{ entry.party.name }}</option></select></label></div>
+                            <div v-else class="mt-3"><p class="text-[10px] font-semibold text-slate-400">Partai pendukung</p><div class="mt-2 flex flex-wrap gap-2"><label v-for="party in parties" :key="party.id" class="rounded-lg border border-white/10 px-2 py-1.5 text-xs text-slate-400"><input v-model="editParticipantForm.supporting_party_ids" type="checkbox" :value="party.id" class="mr-2">{{ party.abbreviation }}</label></div></div>
+                            <label class="mt-3 flex items-center gap-2 text-xs text-slate-300"><input v-model="editParticipantForm.active" type="checkbox"> Kandidat aktif</label><p v-if="Object.keys(editParticipantForm.errors).length" class="mt-2 text-xs text-rose-300">{{ Object.values(editParticipantForm.errors)[0] }}</p><button :disabled="editParticipantForm.processing" class="mt-3 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white">Simpan perubahan</button>
+                        </form>
 
                         <form class="mt-4 rounded-xl border border-dashed border-blue-400/20 p-4" @submit.prevent="createParticipant(contest.id)">
                             <h4 class="text-xs font-bold text-slate-200">{{ event.type === 'pileg' ? 'Tambah caleg' : 'Tambah paslon' }}</h4>

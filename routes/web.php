@@ -70,6 +70,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin'])->prefix('admin')->na
     Route::patch('/contests/{contest}', [ContestController::class, 'update'])->middleware('throttle:admin-write')->name('contests.update');
     Route::post('/contests/{contest}/participants', [ContestParticipantController::class, 'store'])->middleware('throttle:admin-write')->name('participants.store');
     Route::post('/participants/{participant}', [ContestParticipantController::class, 'update'])->middleware('throttle:admin-write')->name('participants.update');
+    Route::delete('/participants/{participant}', [ContestParticipantController::class, 'destroy'])->middleware('throttle:admin-write')->name('participants.destroy');
     Route::get('/geography', [GeographyController::class, 'index'])->name('geography.index');
     Route::post('/geography', [GeographyController::class, 'store'])->middleware('throttle:admin-write')->name('geography.store');
     Route::patch('/geography/{region}', [GeographyController::class, 'update'])->middleware('throttle:admin-write')->name('geography.update');

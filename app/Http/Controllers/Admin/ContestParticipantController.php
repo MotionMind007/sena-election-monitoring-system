@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\Audit\WriteAuditLog;
+use App\Actions\Elections\DeleteContestParticipant;
 use App\Http\Controllers\Controller;
 use App\Models\ContestParticipant;
 use App\Models\ElectionContest;
@@ -46,7 +47,14 @@ class ContestParticipantController extends Controller
         $participant->supportingParties()->sync($supportingPartyIds);
         $audit->handle($request->user(), 'contest_participant.updated', $participant, before: $before, after: $participant->fresh()->toArray());
 
-        return back()->with('success', 'Data paslon berhasil diperbarui.');
+        return back()->with('success', $participant->participant_type === 'candidate' ? 'Data caleg berhasil diperbarui.' : 'Data paslon berhasil diperbarui.');
+    }
+
+    public function destroy(Request $request, ContestParticipant $participant, DeleteContestParticipant $action): RedirectResponse
+    {
+        $action->handle($request->user(), $participant);
+
+        return back()->with('success', 'Kandidat berhasil dihapus.');
     }
 
     public function photo(Request $request, ContestParticipant $participant): StreamedResponse
