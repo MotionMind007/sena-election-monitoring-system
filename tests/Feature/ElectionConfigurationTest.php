@@ -83,6 +83,23 @@ class ElectionConfigurationTest extends TestCase
         $this->assertSame(0, $contest->participants()->where('ballot_number', '2')->firstOrFail()->supportingParties()->count());
     }
 
+    public function test_pileg_dapil_can_split_one_district_by_village_and_prevents_overlap(): void
+    {
+        [$admin, $province, $regency, $district, $villageOne] = $this->regionFixture();
+        $villageTwo = Region::query()->create(['code' => 'V-SYN-2', 'name' => 'Kampung Sintetis Dua', 'level' => RegionLevel::Village, 'parent_id' => $district->id, 'source' => 'manual']);
+        $event = app(CreateElection::class)->handle($admin, ['name' => 'Pileg Cakupan Kampung', 'year' => 2032, 'type' => 'pileg', 'scope_region_id' => $province->id]);
+
+        $this->actingAs($admin)->post(route('admin.electoral-districts.store', $event), ['name' => 'Dapil Sentani 1', 'region_ids' => [$villageOne->id]])->assertSessionHasNoErrors();
+        $this->actingAs($admin)->post(route('admin.electoral-districts.store', $event), ['name' => 'Dapil Sentani 2', 'region_ids' => [$villageTwo->id]])->assertSessionHasNoErrors();
+        $this->actingAs($admin)->post(route('admin.electoral-districts.store', $event), ['name' => 'Dapil Tumpang Tindih', 'region_ids' => [$district->id]])->assertSessionHasErrors('region_ids');
+
+        $dapil = $event->electoralDistricts()->where('name', 'Dapil Sentani 1')->firstOrFail();
+        $this->actingAs($admin)->patch(route('admin.electoral-districts.update', $dapil), ['name' => 'Dapil Sentani Barat', 'region_ids' => [$villageOne->id]])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('electoral_districts', ['id' => $dapil->id, 'name' => 'Dapil Sentani Barat']);
+        $this->actingAs($admin)->delete(route('admin.electoral-districts.destroy', $dapil))->assertSessionHasNoErrors();
+        $this->assertDatabaseMissing('electoral_districts', ['id' => $dapil->id]);
+    }
+
     public function test_super_admin_can_correct_or_delete_unused_pilkada_participant(): void
     {
         [$admin, $province] = $this->regionFixture();

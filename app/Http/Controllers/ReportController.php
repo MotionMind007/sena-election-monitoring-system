@@ -152,7 +152,7 @@ class ReportController extends Controller
         if ($correctionOf) {
             abort_unless($existingSubmission && $existingSubmission->id === $correctionOf, 404);
         }
-        $participants = $contest->participantsForDistrict($eventTps->pollingStation->region->parent_id);
+        $participants = $contest->participantsForRegion($eventTps->pollingStation->region);
 
         $draft = null;
         if ($request->integer('draft')) {

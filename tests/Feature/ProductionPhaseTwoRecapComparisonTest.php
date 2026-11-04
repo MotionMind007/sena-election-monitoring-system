@@ -251,7 +251,14 @@ class ProductionPhaseTwoRecapComparisonTest extends TestCase
 
     private function submitReport(User $witness, ElectionPollingStation $station, $contest, array $votes, int $invalidVotes): VoteSubmission
     {
-        $this->actingAs($witness)->post(route('reports.store'), [
+        $previous = VoteSubmission::query()
+            ->where('election_id', $station->election_id)
+            ->where('election_contest_id', $contest->id)
+            ->where('election_polling_station_id', $station->id)
+            ->where('status', '!=', 'draft')
+            ->latest('version')
+            ->first();
+        $payload = [
             'election_id' => $station->election_id,
             'election_contest_id' => $contest->id,
             'election_polling_station_id' => $station->id,
@@ -260,7 +267,11 @@ class ProductionPhaseTwoRecapComparisonTest extends TestCase
             'items' => $contest->participants->values()->map(fn ($participant, $index) => ['participant_id' => $participant->id, 'votes' => $votes[$index]])->all(),
             'invalid_votes' => $invalidVotes,
             'evidence' => [UploadedFile::fake()->image('c-hasil.jpg', 1280, 960)],
-        ])->assertRedirect();
+        ];
+        if ($previous) {
+            $payload['correction_of_submission_id'] = $previous->id;
+        }
+        $this->actingAs($witness)->post(route('reports.store'), $payload)->assertRedirect();
 
         return VoteSubmission::query()->latest('id')->firstOrFail();
     }

@@ -27,21 +27,24 @@ class ElectionContest extends Model
         return $this->hasMany(ContestParticipant::class)->orderBy('display_order');
     }
 
-    public function participantsForDistrict(?int $districtRegionId): Collection
+    public function participantsForRegion(?Region $village): Collection
     {
         $participants = $this->participants()->where('active', true)
             ->with(['electionParty.electoralDistricts.regions', 'electoralDistrict'])->get();
-        if ($this->type !== 'legislative' || ! $districtRegionId) {
+        if ($this->type !== 'legislative' || ! $village) {
             return $participants;
         }
 
-        return $participants->filter(function (ContestParticipant $participant) use ($districtRegionId): bool {
+        $coverageMatches = fn (ElectoralDistrict $dapil): bool => $dapil->regions->contains('id', $village->id)
+            || ($village->parent_id && $dapil->regions->contains('id', $village->parent_id));
+
+        return $participants->filter(function (ContestParticipant $participant) use ($coverageMatches): bool {
             if ($participant->participant_type === 'candidate') {
-                return $participant->electoralDistrict?->regions()->whereKey($districtRegionId)->exists() ?? false;
+                return $participant->electoralDistrict ? $coverageMatches($participant->electoralDistrict) : false;
             }
             if ($participant->participant_type === 'party') {
                 return $participant->electionParty?->electoralDistricts->contains(
-                    fn (ElectoralDistrict $dapil) => $dapil->regions->contains('id', $districtRegionId)
+                    $coverageMatches
                 ) ?? false;
             }
 

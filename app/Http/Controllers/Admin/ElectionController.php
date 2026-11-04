@@ -36,6 +36,7 @@ class ElectionController extends Controller
             ])->latest()->get(),
             'scopeRegions' => Region::query()->whereIn('level', ['province', 'regency', 'city'])->orderBy('code')->get(['id', 'code', 'name', 'level']),
             'districts' => Region::query()->where('level', 'district')->with('parent:id,name,parent_id')->orderBy('name')->get(['id', 'name', 'parent_id']),
+            'villages' => Region::query()->where('level', 'village')->with('parent:id,name,parent_id')->orderBy('name')->get(['id', 'name', 'parent_id']),
             'parties' => Party::query()->orderBy('name')->get(['id', 'name', 'abbreviation', 'logo_path', 'active']),
             'eventStatuses' => collect(ElectionStatus::cases())->map(fn (ElectionStatus $status) => $status->value),
         ]);

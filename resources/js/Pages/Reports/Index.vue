@@ -103,7 +103,7 @@ const selectedDapil = computed(() => props.electoralDistricts.find((item) => ite
 const stationsForDapil = computed(() => {
     if (!isPileg.value) return props.stations;
     if (!selectedDapil.value) return [];
-    return props.stations.filter((station) => selectedDapil.value?.region_ids.includes(station.district_id));
+    return props.stations.filter((station) => selectedDapil.value?.region_ids.includes(station.district_id) || selectedDapil.value?.region_ids.includes(station.village_id));
 });
 
 function locationOptions(stations: Station[], idKey: 'regency_id' | 'district_id' | 'village_id', nameKey: 'regency' | 'district' | 'village'): LocationOption[] {

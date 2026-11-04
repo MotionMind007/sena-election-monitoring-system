@@ -25,8 +25,8 @@ class RecapAggregate
             ->whereHas('pollingStation', fn ($query) => $query->whereIn('region_id', $regionIds))
             ->pluck('id');
 
-        $participants = $contest->type === 'legislative' && $region->level === RegionLevel::District
-            ? $contest->participantsForDistrict($region->id)
+        $participants = $contest->type === 'legislative' && $region->level === RegionLevel::Village
+            ? $contest->participantsForRegion($region)
             : $contest->participants()->where('active', true)->get();
         $participantIds = $participants->pluck('id')->map(fn ($id) => (int) $id);
         $votes = $participantIds->mapWithKeys(fn (int $id) => [$id => 0])->all();

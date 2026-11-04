@@ -61,8 +61,8 @@ class SaveVoteSubmission
             }
         }
 
-        $districtRegionId = $eventTps->pollingStation()->with('region')->first()?->region?->parent_id;
-        $applicableParticipants = $contest->participantsForDistrict($districtRegionId);
+        $village = $eventTps->pollingStation()->with('region')->first()?->region;
+        $applicableParticipants = $contest->participantsForRegion($village);
         $participantIds = $applicableParticipants->pluck('id')->sort()->values();
         $submittedIds = collect($data['items'])->pluck('participant_id')->map(fn ($id) => (int) $id)->sort()->values();
         if ($participantIds->isEmpty() || $participantIds->all() !== $submittedIds->all()) {

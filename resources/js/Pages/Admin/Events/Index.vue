@@ -5,6 +5,7 @@ import { computed, reactive, ref, watch } from 'vue';
 
 type ScopeRegion = { id: number; code: string; name: string; level: string };
 type District = { id: number; name: string; parent_id: number; parent?: { id: number; name: string } };
+type Village = { id: number; name: string; parent_id: number; parent?: { id: number; name: string } };
 type Party = { id: number; name: string; abbreviation: string; logo_path?: string | null; active: boolean };
 type Dapil = { id: number; name: string; regions: District[] };
 type ElectionParty = { id: number; ballot_number: string; party: Party; electoral_districts: Dapil[] };
@@ -12,7 +13,7 @@ type Participant = { id: number; election_contest_id: number; participant_type: 
 type Contest = { id: number; name: string; type: string; status: string; ballot_schema_version?: string | null; participants: Participant[] };
 type Election = { id: number; name: string; year: number; type: 'pilkada' | 'pileg'; status: string; scope_region: ScopeRegion; contests: Contest[]; electoral_districts: Dapil[]; election_parties: ElectionParty[] };
 
-const props = defineProps<{ events: Election[]; scopeRegions: ScopeRegion[]; districts: District[]; parties: Party[]; eventStatuses: string[] }>();
+const props = defineProps<{ events: Election[]; scopeRegions: ScopeRegion[]; districts: District[]; villages: Village[]; parties: Party[]; eventStatuses: string[] }>();
 const page = usePage();
 const form = useForm({ name: '', year: new Date().getFullYear(), type: 'pilkada', scope_region_id: '' as number | string });
 const partyForm = useForm({ name: '', abbreviation: '', logo: null as File | null });
@@ -27,6 +28,8 @@ const makeParticipantForm = (contest: Contest) => useForm({
 const dapilForms = reactive<Record<number, ReturnType<typeof makeDapilForm>>>({});
 const electionPartyForms = reactive<Record<number, ReturnType<typeof makeElectionPartyForm>>>({});
 const participantForms = reactive<Record<number, ReturnType<typeof makeParticipantForm>>>({});
+const editingDapilId = ref<number | null>(null);
+const coverageDistrictId = ref<number | string>('');
 const editingParticipant = ref<Participant | null>(null);
 const editParticipantForm = useForm({ ballot_number: '', display_name: '', display_order: 1, active: true, photo: null as File | null, supporting_party_ids: [] as number[], election_party_id: '' as number | string, electoral_district_id: '' as number | string });
 
@@ -47,12 +50,28 @@ watch(() => props.events, (events) => {
 const selectedScopeLevel = computed(() => props.scopeRegions.find((region) => region.id === Number(form.scope_region_id))?.level);
 const scopeLabel = computed(() => ! selectedScopeLevel.value ? 'Provinsi/Kabupaten/Kota' : (selectedScopeLevel.value === 'province' ? 'Provinsi' : 'Kabupaten/Kota'));
 const districtsForEvent = (event: Election) => event.scope_region.level === 'province' ? props.districts : props.districts.filter((district) => district.parent_id === event.scope_region.id);
+const villagesForCoverage = (event: Election) => props.villages.filter((village) => village.parent_id === Number(coverageDistrictId.value) && districtsForEvent(event).some((district) => district.id === village.parent_id));
 const nonPartyParticipants = (contest: Contest) => contest.participants.filter((item) => item.participant_type !== 'party');
 const partyOptionsForDapil = (event: Election, dapilId: number | string) => event.election_parties.filter((item) => item.electoral_districts.some((dapil) => dapil.id === Number(dapilId)));
 
 const submit = () => form.post(route('admin.events.store'), { preserveScroll: true, onSuccess: () => form.reset('name') });
 const createParty = () => partyForm.post(route('admin.parties.store'), { forceFormData: true, preserveScroll: true, onSuccess: () => partyForm.reset() });
 const createDapil = (eventId: number) => dapilForms[eventId].post(route('admin.electoral-districts.store', eventId), { preserveScroll: true, onSuccess: () => dapilForms[eventId].reset() });
+const updateDapil = (eventId: number) => {
+    if (!editingDapilId.value) return;
+    dapilForms[eventId].patch(route('admin.electoral-districts.update', editingDapilId.value), { preserveScroll: true, onSuccess: () => { dapilForms[eventId].reset(); editingDapilId.value = null; } });
+};
+const beginEditDapil = (eventId: number, dapil: Dapil) => {
+    editingDapilId.value = dapil.id;
+    dapilForms[eventId].name = dapil.name;
+    dapilForms[eventId].region_ids = dapil.regions.map((region) => region.id);
+    const first = dapil.regions[0];
+    coverageDistrictId.value = first?.parent_id ?? first?.id ?? '';
+};
+const deleteDapil = (dapil: Dapil) => {
+    if (!window.confirm(`Hapus dapil \"${dapil.name}\"?`)) return;
+    router.delete(route('admin.electoral-districts.destroy', dapil.id), { preserveScroll: true });
+};
 const createElectionParty = (eventId: number) => electionPartyForms[eventId].post(route('admin.election-parties.store', eventId), { preserveScroll: true, onSuccess: () => electionPartyForms[eventId].reset() });
 const createParticipant = (contestId: number) => participantForms[contestId].post(route('admin.participants.store', contestId), { forceFormData: true, preserveScroll: true, onSuccess: () => participantForms[contestId].reset() });
 const updateEventStatus = (eventId: number) => router.patch(route('admin.events.status', eventId), { status: eventStatusValues.value[eventId] }, { preserveScroll: true });
@@ -139,13 +158,17 @@ const setFile = (target: { logo?: File | null; photo?: File | null }, key: 'logo
                     </div>
 
                     <div v-if="event.type === 'pileg'" class="mt-5 grid gap-4 border-t border-white/10 pt-5 lg:grid-cols-2">
-                        <form class="rounded-xl border border-white/10 bg-slate-950/20 p-4" @submit.prevent="createDapil(event.id)">
-                            <h3 class="text-sm font-bold text-white">Tambah dapil</h3>
+                        <form class="rounded-xl border border-white/10 bg-slate-950/20 p-4" @submit.prevent="editingDapilId ? updateDapil(event.id) : createDapil(event.id)">
+                            <div class="flex items-center justify-between gap-3"><h3 class="text-sm font-bold text-white">{{ editingDapilId ? 'Edit dapil' : 'Tambah dapil' }}</h3><button v-if="editingDapilId" type="button" class="text-xs text-slate-400" @click="editingDapilId = null; dapilForms[event.id].reset()">Batal</button></div>
                             <input v-model="dapilForms[event.id].name" required placeholder="Contoh: Kabupaten Jayapura Dapil 1" class="mt-3 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-xs text-white">
-                            <p class="mt-3 text-[11px] font-semibold text-slate-300">Cakupan distrik</p>
+                            <p class="mt-3 text-[11px] font-semibold text-slate-300">Distrik utuh</p>
                             <div class="mt-2 max-h-36 space-y-1 overflow-y-auto rounded-lg border border-white/10 p-2"><label v-for="district in districtsForEvent(event)" :key="district.id" class="flex items-center gap-2 rounded px-2 py-1.5 text-xs text-slate-400 hover:bg-white/5"><input v-model="dapilForms[event.id].region_ids" type="checkbox" :value="district.id">{{ district.name }} <span class="text-slate-600">{{ district.parent?.name }}</span></label></div>
+                            <p class="mt-3 text-[11px] font-semibold text-slate-300">Atau pilih kampung/kelurahan dari distrik tertentu</p>
+                            <select v-model="coverageDistrictId" class="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-xs text-white"><option value="">Pilih distrik</option><option v-for="district in districtsForEvent(event)" :key="district.id" :value="district.id">{{ district.name }}</option></select>
+                            <div v-if="coverageDistrictId" class="mt-2 max-h-36 space-y-1 overflow-y-auto rounded-lg border border-white/10 p-2"><label v-for="village in villagesForCoverage(event)" :key="village.id" class="flex items-center gap-2 rounded px-2 py-1.5 text-xs text-slate-400 hover:bg-white/5"><input v-model="dapilForms[event.id].region_ids" type="checkbox" :value="village.id">{{ village.name }}</label><p v-if="!villagesForCoverage(event).length" class="px-2 py-2 text-xs text-slate-600">Belum ada kampung/kelurahan pada distrik ini.</p></div>
+                            <p class="mt-2 text-[10px] leading-4 text-amber-200/80">Sistem menolak wilayah yang bertumpang tindih dengan dapil lain, termasuk distrik dan kampung di dalamnya.</p>
                             <p v-if="Object.keys(dapilForms[event.id].errors).length" class="mt-2 text-xs text-rose-300">{{ Object.values(dapilForms[event.id].errors)[0] }}</p>
-                            <button class="mt-3 w-full rounded-lg bg-violet-600 px-3 py-2 text-xs font-bold text-white">Simpan dapil</button>
+                            <button class="mt-3 w-full rounded-lg bg-violet-600 px-3 py-2 text-xs font-bold text-white">{{ editingDapilId ? 'Simpan perubahan' : 'Simpan dapil' }}</button>
                         </form>
 
                         <form class="rounded-xl border border-white/10 bg-slate-950/20 p-4" @submit.prevent="createElectionParty(event.id)">
@@ -158,7 +181,7 @@ const setFile = (target: { logo?: File | null; photo?: File | null }, key: 'logo
                         </form>
                     </div>
 
-                    <div v-if="event.type === 'pileg' && event.electoral_districts.length" class="mt-4 flex flex-wrap gap-2"><div v-for="dapil in event.electoral_districts" :key="dapil.id" class="rounded-lg border border-white/10 bg-white/[.025] px-3 py-2"><p class="text-xs font-bold text-slate-200">{{ dapil.name }}</p><p class="mt-1 text-[10px] text-slate-500">{{ dapil.regions.map((region) => region.name).join(', ') }}</p></div></div>
+                    <div v-if="event.type === 'pileg' && event.electoral_districts.length" class="mt-4 flex flex-wrap gap-2"><div v-for="dapil in event.electoral_districts" :key="dapil.id" class="rounded-lg border border-white/10 bg-white/[.025] px-3 py-2"><p class="text-xs font-bold text-slate-200">{{ dapil.name }}</p><p class="mt-1 text-[10px] text-slate-500">{{ dapil.regions.map((region) => region.name).join(', ') }}</p><div class="mt-2 flex gap-2"><button class="text-[10px] font-bold text-blue-300" @click="beginEditDapil(event.id, dapil)">Edit</button><button class="text-[10px] font-bold text-rose-300" @click="deleteDapil(dapil)">Hapus</button></div></div></div>
 
                     <div v-for="contest in event.contests" :key="contest.id" class="mt-5 border-t border-white/10 pt-5">
                         <div class="flex flex-wrap items-center justify-between gap-3"><div><h3 class="text-sm font-bold text-white">{{ contest.name }}</h3><p class="text-[10px] uppercase tracking-wider text-slate-500">{{ contest.ballot_schema_version }}</p></div><div class="flex gap-2"><select v-model="contestStatuses[contest.id]" class="rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-xs text-white"><option value="draft">draft</option><option value="active">active</option><option value="closed">closed</option></select><button class="rounded-lg bg-slate-700 px-3 py-2 text-xs font-bold text-white" @click="updateContestStatus(contest.id)">Simpan</button></div></div>
