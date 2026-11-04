@@ -102,6 +102,7 @@ class DashboardReadModel
                     'id' => $participant->id,
                     'name' => $participant->display_name,
                     'number' => $participant->ballot_number,
+                    'photo_url' => $participant->photo_path ? route('participants.photo', $participant) : null,
                     'party' => $participant->electionParty?->party?->abbreviation,
                     'dapil' => $participant->electoralDistrict?->name,
                     'votes' => $votes,
