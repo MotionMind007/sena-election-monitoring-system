@@ -50,7 +50,7 @@ class ReportController extends Controller
             ->with(['election', 'pollingStation.region.parent.parent', 'pollingStation.region.parent'])->orderBy('id')->get()
             ->filter(fn (ElectionPollingStation $station) => $scope->canAccessPollingStation($request->user(), $station))->values();
         $submissions = VoteSubmission::query()->where('election_id', $event->id)->whereIn('election_polling_station_id', $stations->pluck('id'))
-            ->with(['contest:id,name', 'eventTps.pollingStation.region:id,name', 'totals', 'submitter:id,name'])->latest('id')->limit(30)->get();
+            ->with(['contest:id,name', 'eventTps.pollingStation.region.parent.parent', 'totals', 'submitter:id,name'])->latest('id')->limit(30)->get();
         $canViewRecaps = $request->user()->hasAnyRole(UserRole::SuperAdmin, UserRole::Coordinator);
         $recapRegions = collect();
         if ($canViewRecaps) {
@@ -249,7 +249,14 @@ class ReportController extends Controller
 
     private function submissionSummary(VoteSubmission $submission): array
     {
-        return ['id' => $submission->id, 'contest_id' => $submission->election_contest_id, 'event_tps_id' => $submission->election_polling_station_id, 'contest' => $submission->contest?->name, 'tps' => $submission->eventTps?->pollingStation?->code, 'area' => $submission->eventTps?->pollingStation?->region?->name, 'status' => $submission->status->value, 'version' => $submission->version, 'entry_mode' => $submission->entry_mode, 'submitter' => $submission->submitter?->name, 'total_votes' => $submission->totals?->total_votes, 'submitted_at' => $submission->submitted_at?->format('d M Y, H:i')];
+        $station = $submission->eventTps?->pollingStation;
+        $village = $station?->region;
+        $district = $village?->parent;
+        $regency = $district?->parent;
+        $tpsName = filled($station?->location_label) ? $station->location_label : ($station ? sprintf('TPS %03d', $station->number) : null);
+        $area = collect([$village?->name, $district?->name, $regency?->name])->filter()->join(' · ');
+
+        return ['id' => $submission->id, 'contest_id' => $submission->election_contest_id, 'event_tps_id' => $submission->election_polling_station_id, 'contest' => $submission->contest?->name, 'tps' => $tpsName, 'area' => $area, 'status' => $submission->status->value, 'version' => $submission->version, 'entry_mode' => $submission->entry_mode, 'submitter' => $submission->submitter?->name, 'total_votes' => $submission->totals?->total_votes, 'submitted_at' => $submission->submitted_at?->format('d M Y, H:i')];
     }
 
     private function ocrSuggestion(VoteSubmission $draft, int $participantCount): ?array

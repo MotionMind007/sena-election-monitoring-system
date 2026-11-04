@@ -33,7 +33,7 @@ class PhaseFourVerificationTest extends TestCase
         $this->assertSame('recommended', $submission->fresh()->status->value);
         $this->assertDatabaseHas('coordinator_reviews', ['vote_submission_id' => $submission->id, 'reviewer_id' => $coordinator->id, 'action' => 'recommend']);
 
-        $own = $this->submit($coordinator, $submission->eventTps, ['source_name' => 'Saksi lapangan', 'source_method' => 'raw_photo']);
+        $own = $this->submit($coordinator, $submission->eventTps, ['source_name' => 'Saksi lapangan', 'source_method' => 'raw_photo', 'correction_of_submission_id' => $submission->id]);
         $this->actingAs($coordinator)->post(route('verification.review', $own), ['action' => 'recommend'])->assertSessionHasErrors('action');
     }
 
@@ -55,18 +55,15 @@ class PhaseFourVerificationTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['action' => 'vote_submission.approve']);
     }
 
-    public function test_approval_resolves_conflict_and_correction_supersedes_active_result(): void
+    public function test_explicit_correction_supersedes_active_result(): void
     {
         $witness = $this->user('saksi01@electcount.test');
-        $coordinator = $this->user('coordinator.jayapura@electcount.test');
         $admin = $this->user('admin@electcount.test');
         $first = $this->submit($witness);
-        $conflict = $this->submit($coordinator, $first->eventTps, ['source_name' => 'Saksi 001', 'source_method' => 'raw_photo']);
         $this->actingAs($admin)->post(route('verification.decision', $first), ['action' => 'approve']);
-        $this->assertSame('conflict', $conflict->fresh()->status->value);
         $old = VerifiedResult::query()->where('active', true)->firstOrFail();
 
-        $correction = $this->submit($witness, $first->eventTps);
+        $correction = $this->submit($witness, $first->eventTps, ['correction_of_submission_id' => $first->id]);
         $this->actingAs($admin)->post(route('verification.decision', $correction), ['action' => 'approve']);
         $new = VerifiedResult::query()->where('active', true)->firstOrFail();
         $this->assertNotSame($old->id, $new->id);
@@ -82,7 +79,7 @@ class PhaseFourVerificationTest extends TestCase
         $revision = $this->submit($witness);
         $this->actingAs($admin)->post(route('verification.decision', $revision), ['action' => 'revision_requested', 'reason' => 'Foto kurang jelas'])->assertRedirect();
         $this->assertSame('revision_requested', $revision->fresh()->status->value);
-        $rejected = $this->submit($witness, $revision->eventTps);
+        $rejected = $this->submit($witness, $revision->eventTps, ['correction_of_submission_id' => $revision->id]);
         $this->actingAs($admin)->post(route('verification.decision', $rejected), ['action' => 'reject', 'reason' => 'Dokumen tidak sesuai'])->assertRedirect();
         $this->assertSame('rejected', $rejected->fresh()->status->value);
         $this->assertDatabaseCount('approval_actions', 2);

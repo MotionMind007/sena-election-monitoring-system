@@ -26,7 +26,7 @@ class VerificationController extends Controller
             'status' => ['nullable', 'string', 'in:submitted,recommended,revision_requested,rejected,approved,conflict'],
         ]);
         $query = VoteSubmission::query()
-            ->with(['election:id,name,year', 'contest:id,name', 'eventTps.pollingStation.region:id,name', 'submitter:id,name', 'totals'])
+            ->with(['election:id,name,year', 'contest:id,name', 'eventTps.pollingStation.region.parent.parent', 'submitter:id,name', 'totals'])
             ->whereNot('status', SubmissionStatus::Draft->value);
 
         if ($request->user()->hasRole(UserRole::Coordinator)) {
@@ -51,8 +51,8 @@ class VerificationController extends Controller
                 'id' => $item->id,
                 'event' => $item->election->name,
                 'contest' => $item->contest->name,
-                'tps' => $item->eventTps->pollingStation->code,
-                'area' => $item->eventTps->pollingStation->region->name,
+                'tps' => $item->eventTps->pollingStation->location_label ?: sprintf('TPS %03d', $item->eventTps->pollingStation->number),
+                'area' => collect([$item->eventTps->pollingStation->region->name, $item->eventTps->pollingStation->region->parent?->name, $item->eventTps->pollingStation->region->parent?->parent?->name])->filter()->join(' · '),
                 'submitter' => $item->submitter->name,
                 'status' => $item->status->value,
                 'version' => $item->version,
