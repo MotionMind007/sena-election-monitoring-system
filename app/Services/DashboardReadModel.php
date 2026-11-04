@@ -104,6 +104,7 @@ class DashboardReadModel
                     'number' => $participant->ballot_number,
                     'photo_url' => $participant->photo_path ? route('participants.photo', $participant) : null,
                     'party' => $participant->electionParty?->party?->abbreviation,
+                    'dapil_id' => $participant->electoral_district_id,
                     'dapil' => $participant->electoralDistrict?->name,
                     'votes' => $votes,
                     'percentage' => $validVotes > 0 ? round(($votes / $validVotes) * 100, 1) : 0,
