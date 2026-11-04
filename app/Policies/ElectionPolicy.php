@@ -30,4 +30,9 @@ class ElectionPolicy
     {
         return $user->hasRole(UserRole::SuperAdmin);
     }
+
+    public function delete(User $user): bool
+    {
+        return $user->hasRole(UserRole::SuperAdmin);
+    }
 }

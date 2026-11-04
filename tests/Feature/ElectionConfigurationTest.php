@@ -123,6 +123,30 @@ class ElectionConfigurationTest extends TestCase
         $this->assertSame(60, $result['legislative_candidates'][0]['votes']);
     }
 
+    public function test_super_admin_deletes_an_event_without_operational_data_and_keeps_master_tps(): void
+    {
+        [$admin, $event, , $village] = $this->pilegFixture(withPollingStation: true);
+        $this->actingAs($admin)->delete(route('admin.events.destroy', $event))->assertSessionHasNoErrors();
+
+        $this->assertDatabaseMissing('elections', ['id' => $event->id]);
+        $this->assertDatabaseHas('polling_stations', ['region_id' => $village->id]);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'election.deleted', 'object_id' => (string) $event->id]);
+    }
+
+    public function test_event_with_a_report_cannot_be_deleted(): void
+    {
+        [$admin, $event] = $this->pilegFixture(withPollingStation: true);
+        $contest = $event->contests()->firstOrFail();
+        $eventTps = ElectionPollingStation::query()->where('election_id', $event->id)->firstOrFail();
+        VoteSubmission::query()->create([
+            'election_id' => $event->id, 'election_contest_id' => $contest->id, 'election_polling_station_id' => $eventTps->id,
+            'submitter_id' => User::factory()->role(UserRole::Witness)->create()->id, 'status' => 'draft', 'entry_mode' => 'direct', 'idempotency_key' => Str::uuid(), 'version' => 1,
+        ]);
+
+        $this->actingAs($admin)->delete(route('admin.events.destroy', $event))->assertSessionHasErrors('event');
+        $this->assertDatabaseHas('elections', ['id' => $event->id]);
+    }
+
     private function pilegFixture(bool $withPollingStation = false): array
     {
         [$admin, $province, $regency, $district, $village] = $this->regionFixture();

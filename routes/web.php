@@ -65,6 +65,7 @@ Route::middleware(['auth', 'verified', 'role:super_admin'])->prefix('admin')->na
     Route::post('/events/{election}/dapil', [ElectoralDistrictController::class, 'store'])->middleware('throttle:admin-write')->name('electoral-districts.store');
     Route::post('/events/{election}/parties', [ElectionPartyController::class, 'store'])->middleware('throttle:admin-write')->name('election-parties.store');
     Route::patch('/events/{election}/status', [ElectionController::class, 'updateStatus'])->middleware('throttle:admin-write')->name('events.status');
+    Route::delete('/events/{election}', [ElectionController::class, 'destroy'])->middleware('throttle:admin-write')->name('events.destroy');
     Route::post('/events/{election}/contests', [ContestController::class, 'store'])->middleware('throttle:admin-write')->name('contests.store');
     Route::patch('/contests/{contest}', [ContestController::class, 'update'])->middleware('throttle:admin-write')->name('contests.update');
     Route::post('/contests/{contest}/participants', [ContestParticipantController::class, 'store'])->middleware('throttle:admin-write')->name('participants.store');

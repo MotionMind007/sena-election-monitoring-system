@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Actions\Audit\WriteAuditLog;
 use App\Actions\Elections\CreateElection;
+use App\Actions\Elections\DeleteElection;
 use App\Enums\ElectionStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreElectionRequest;
@@ -56,5 +57,13 @@ class ElectionController extends Controller
         $audit->handle($request->user(), 'election.status_updated', $election, before: $before, after: $election->fresh()->toArray());
 
         return back()->with('success', 'Status event berhasil diperbarui.');
+    }
+
+    public function destroy(Request $request, Election $election, DeleteElection $action): RedirectResponse
+    {
+        $this->authorize('delete', $election);
+        $action->handle($request->user(), $election);
+
+        return to_route('admin.events.index')->with('success', 'Event berhasil dihapus. Master wilayah dan TPS tidak ikut dihapus.');
     }
 }

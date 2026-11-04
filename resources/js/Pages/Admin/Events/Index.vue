@@ -55,6 +55,10 @@ const createElectionParty = (eventId: number) => electionPartyForms[eventId].pos
 const createParticipant = (contestId: number) => participantForms[contestId].post(route('admin.participants.store', contestId), { forceFormData: true, preserveScroll: true, onSuccess: () => participantForms[contestId].reset() });
 const updateEventStatus = (eventId: number) => router.patch(route('admin.events.status', eventId), { status: eventStatusValues.value[eventId] }, { preserveScroll: true });
 const updateContestStatus = (contestId: number) => router.patch(route('admin.contests.update', contestId), { status: contestStatuses.value[contestId] }, { preserveScroll: true });
+const deleteEvent = (event: Election) => {
+    if (! window.confirm(`Hapus event \"${event.name}\"? Konfigurasi, penugasan, dan tautan TPS event akan dihapus. Master wilayah dan TPS tetap aman.`)) return;
+    router.delete(route('admin.events.destroy', event.id), { preserveScroll: true });
+};
 const setFile = (target: { logo?: File | null; photo?: File | null }, key: 'logo' | 'photo', event: Event) => target[key] = (event.target as HTMLInputElement).files?.[0] ?? null;
 </script>
 
@@ -109,7 +113,7 @@ const setFile = (target: { logo?: File | null; photo?: File | null }, key: 'logo
                 <article v-for="event in events" :key="event.id" class="glass-panel rounded-2xl p-5">
                     <div class="flex flex-wrap items-start justify-between gap-4">
                         <div><div class="flex items-center gap-2"><span class="rounded-full bg-blue-500/10 px-2 py-1 text-[10px] font-bold uppercase text-blue-300">{{ event.type }}</span><h2 class="font-bold text-white">{{ event.name }}</h2></div><p class="mt-1 text-xs text-slate-400">{{ event.year }} · {{ event.scope_region.name }}</p></div>
-                        <div class="flex gap-2"><select v-model="eventStatusValues[event.id]" class="rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-xs text-white"><option v-for="status in eventStatuses" :key="status" :value="status">{{ status.replace('_', ' ') }}</option></select><button class="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white" @click="updateEventStatus(event.id)">Simpan status</button></div>
+                        <div class="flex flex-wrap justify-end gap-2"><select v-model="eventStatusValues[event.id]" class="rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-xs text-white"><option v-for="status in eventStatuses" :key="status" :value="status">{{ status.replace('_', ' ') }}</option></select><button class="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white" @click="updateEventStatus(event.id)">Simpan status</button><button class="rounded-lg border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-200 hover:bg-rose-500/20" @click="deleteEvent(event)">Hapus event</button></div>
                     </div>
 
                     <div v-if="event.type === 'pileg'" class="mt-5 grid gap-4 border-t border-white/10 pt-5 lg:grid-cols-2">
