@@ -24,7 +24,7 @@ interface DemoPreview {
     updated_at: string | null;
     stats: Omit<DashboardStats, 'assigned'>;
     regions: Array<{ id: number; name: string; level: string; total: number; submitted: number; verified: number }>;
-    candidates: Array<{ id: number; label: string; initials: string; photo_url: string | null; votes: number; percentage: number; tone: string }>;
+    candidates: Array<{ id: number; label: string; initials: string; photo_url: string | null; votes: number; direct_party_votes: number; candidate_votes: number; percentage: number; tone: string }>;
     result_mode: 'party' | 'candidate';
     legislative_candidates: Array<{ id: number; name: string; number: string; party: string; dapil: string; votes: number; percentage: number }>;
     votes: { valid: number; invalid: number; total: number };
@@ -202,7 +202,10 @@ const donutStyle = computed(() => {
 
                 <article class="glass-panel rounded-xl p-4 xl:col-span-5">
                     <div class="flex items-center justify-between"><h2 class="text-sm font-bold text-white">{{ demoPreview.result_mode === 'party' ? 'Perolehan Suara Partai' : 'Perolehan Suara Terverifikasi' }}</h2><span class="rounded-lg border border-white/10 px-2 py-1 text-[10px] text-slate-400">{{ demoPreview.result_mode === 'party' ? 'Lambang + seluruh caleg' : 'Hasil aktif' }}</span></div>
-                    <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    <div v-if="demoPreview.result_mode === 'party'" class="mt-3 overflow-x-auto rounded-xl border border-white/10">
+                        <table class="w-full min-w-[560px] text-left text-[10px]"><thead class="bg-white/[.03] text-slate-500"><tr><th class="px-3 py-2">Partai</th><th class="px-3 py-2 text-right">Lambang</th><th class="px-3 py-2 text-right">Caleg</th><th class="px-3 py-2 text-right">Total</th><th class="px-3 py-2 text-right">%</th></tr></thead><tbody class="divide-y divide-white/5"><tr v-for="party in demoPreview.candidates" :key="party.id"><td class="px-3 py-2.5"><div class="flex items-center gap-2"><img v-if="party.photo_url" :src="party.photo_url" :alt="`Logo ${party.label}`" class="h-6 w-6 rounded object-contain" loading="lazy"><span v-else class="flex h-6 w-6 items-center justify-center rounded bg-white/5 text-[9px] font-bold text-slate-300">{{ party.initials }}</span><span class="font-semibold text-white">{{ party.label }}</span></div></td><td class="px-3 py-2.5 text-right text-slate-300">{{ formatNumber(party.direct_party_votes) }}</td><td class="px-3 py-2.5 text-right text-slate-300">{{ formatNumber(party.candidate_votes) }}</td><td class="px-3 py-2.5 text-right font-bold text-white">{{ formatNumber(party.votes) }}</td><td class="px-3 py-2.5 text-right text-cyan-300">{{ party.percentage }}%</td></tr><tr v-if="!demoPreview.candidates.length"><td colspan="5" class="px-3 py-7 text-center text-slate-500">Belum ada partai peserta aktif pada kontes ini.</td></tr></tbody></table>
+                    </div>
+                    <div v-else class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                         <div v-for="candidate in demoPreview.candidates" :key="candidate.label" :class="candidateTones[candidate.tone]" class="overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br p-3">
                             <div class="relative flex h-24 items-center justify-center overflow-hidden rounded-lg bg-slate-950/35">
                                 <span class="flex h-12 w-12 items-center justify-center rounded-full border border-current/30 bg-current/10 text-base font-black">{{ candidate.initials }}</span>
@@ -251,9 +254,9 @@ const donutStyle = computed(() => {
                 </article>
             </section>
 
-            <section v-if="demoPreview.legislative_candidates.length" class="glass-panel mt-3 overflow-hidden rounded-xl">
-                <div class="border-b border-white/10 px-4 py-3"><h2 class="text-sm font-bold text-white">Perolehan Suara Caleg</h2><p class="mt-1 text-[10px] text-slate-500">Setiap caleg hanya tampil pada satu partai dan satu dapil.</p></div>
-                <div class="overflow-x-auto"><table class="w-full min-w-[700px] text-left text-[10px]"><thead class="bg-white/[.03] text-slate-500"><tr><th class="px-4 py-2">No.</th><th class="px-3 py-2">Nama caleg</th><th class="px-3 py-2">Partai</th><th class="px-3 py-2">Dapil</th><th class="px-3 py-2 text-right">Suara</th><th class="px-4 py-2 text-right">Persentase</th></tr></thead><tbody class="divide-y divide-white/5"><tr v-for="candidate in demoPreview.legislative_candidates" :key="candidate.id"><td class="px-4 py-2 text-slate-400">{{ candidate.number }}</td><td class="px-3 py-2 font-semibold text-white">{{ candidate.name }}</td><td class="px-3 py-2 text-cyan-300">{{ candidate.party }}</td><td class="px-3 py-2 text-slate-300">{{ candidate.dapil }}</td><td class="px-3 py-2 text-right font-semibold text-white">{{ formatNumber(candidate.votes) }}</td><td class="px-4 py-2 text-right text-slate-400">{{ candidate.percentage }}%</td></tr></tbody></table></div>
+            <section v-if="demoPreview.result_mode === 'party'" class="glass-panel mt-3 overflow-hidden rounded-xl">
+                <div class="border-b border-white/10 px-4 py-3"><h2 class="text-sm font-bold text-white">Perolehan Suara Caleg</h2><p class="mt-1 text-[10px] text-slate-500">Diurutkan berdasarkan suara. Caleg hanya muncul pada satu partai dan satu dapil.</p></div>
+                <div class="overflow-x-auto"><table class="w-full min-w-[700px] text-left text-[10px]"><thead class="bg-white/[.03] text-slate-500"><tr><th class="px-4 py-2">No.</th><th class="px-3 py-2">Nama caleg</th><th class="px-3 py-2">Partai</th><th class="px-3 py-2">Dapil</th><th class="px-3 py-2 text-right">Suara</th><th class="px-4 py-2 text-right">Persentase</th></tr></thead><tbody class="divide-y divide-white/5"><tr v-for="candidate in demoPreview.legislative_candidates" :key="candidate.id"><td class="px-4 py-2 text-slate-400">{{ candidate.number }}</td><td class="px-3 py-2 font-semibold text-white">{{ candidate.name }}</td><td class="px-3 py-2 text-cyan-300">{{ candidate.party }}</td><td class="px-3 py-2 text-slate-300">{{ candidate.dapil }}</td><td class="px-3 py-2 text-right font-semibold text-white">{{ formatNumber(candidate.votes) }}</td><td class="px-4 py-2 text-right text-slate-400">{{ candidate.percentage }}%</td></tr><tr v-if="!demoPreview.legislative_candidates.length"><td colspan="6" class="px-4 py-8 text-center text-slate-500">Belum ada caleg aktif. Tambahkan caleg pada konfigurasi kontes Pileg.</td></tr></tbody></table></div>
             </section>
 
             <section class="glass-panel mt-3 overflow-hidden rounded-xl">

@@ -77,6 +77,9 @@ class DashboardReadModel
         $regionRows = $this->regionRows($scope, $eventTps, $submittedTps, $verifiedByTps);
         $candidateRows = $groups->values()->map(function (array $group, int $index) use ($voteTotals, $validVotes): array {
             $votes = collect($group['participant_ids'])->sum(fn ($id) => $voteTotals[$id] ?? 0);
+            $directPartyVotes = $group['direct_party_participant_id']
+                ? ($voteTotals[$group['direct_party_participant_id']] ?? 0)
+                : 0;
 
             return [
                 'id' => $group['id'],
@@ -84,10 +87,12 @@ class DashboardReadModel
                 'initials' => $group['initials'],
                 'photo_url' => $group['photo_url'],
                 'votes' => $votes,
+                'direct_party_votes' => $directPartyVotes,
+                'candidate_votes' => $votes - $directPartyVotes,
                 'percentage' => $validVotes > 0 ? round(($votes / $validVotes) * 100, 1) : 0,
                 'tone' => self::TONES[$index % count(self::TONES)],
             ];
-        })->all();
+        })->sortByDesc('votes')->values()->all();
 
         $legislativeCandidates = $contest->type === 'legislative'
             ? $participants->where('participant_type', 'candidate')->map(function (ContestParticipant $participant) use ($voteTotals, $validVotes): array {
