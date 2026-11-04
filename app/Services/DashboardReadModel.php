@@ -77,8 +77,9 @@ class DashboardReadModel
         $regionRows = $this->regionRows($scope, $eventTps, $submittedTps, $verifiedByTps);
         $candidateRows = $groups->values()->map(function (array $group, int $index) use ($voteTotals, $validVotes): array {
             $votes = collect($group['participant_ids'])->sum(fn ($id) => $voteTotals[$id] ?? 0);
-            $directPartyVotes = $group['direct_party_participant_id']
-                ? ($voteTotals[$group['direct_party_participant_id']] ?? 0)
+            $directPartyParticipantId = $group['direct_party_participant_id'] ?? null;
+            $directPartyVotes = $directPartyParticipantId
+                ? ($voteTotals[$directPartyParticipantId] ?? 0)
                 : 0;
 
             return [
