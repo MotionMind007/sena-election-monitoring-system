@@ -302,7 +302,7 @@ if (!isPileg.value) resetRegency();
 
                 <div v-if="selectedStation" class="mt-4 flex flex-col gap-4 rounded-xl border border-emerald-400/15 bg-emerald-400/[.06] p-4 sm:flex-row sm:items-center sm:justify-between">
                     <div><p class="text-sm font-bold text-white">{{ selectedStation.code }}</p><p class="mt-1 text-xs text-slate-400">{{ selectedStation.village }} · {{ selectedStation.district }} · {{ selectedStation.regency }}</p></div>
-                    <Link :href="createHref" :class="createHref === '#' ? 'pointer-events-none opacity-40' : ''" class="shrink-0 rounded-xl bg-blue-600 px-5 py-3 text-center text-sm font-bold text-white hover:bg-blue-500">Lanjut input suara →</Link>
+                    <Link :href="createHref" :class="createHref === '#' ? 'pointer-events-none opacity-40' : ''" class="shrink-0 rounded-xl bg-blue-600 px-5 py-3 text-center text-sm font-bold text-white hover:bg-blue-500">Periksa status TPS →</Link>
                 </div>
                 <p v-else-if="!stationsForDapil.length && (!isPileg || selectedDapil)" class="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 text-xs text-amber-200">Belum ada TPS aktif dalam scope yang dipilih.</p>
             </section>

@@ -177,23 +177,33 @@ class PhaseThreeReportingTest extends TestCase
         $this->assertSame('submitted', VoteSubmission::query()->firstOrFail()->status->value);
     }
 
-    public function test_new_idempotency_key_creates_next_version_and_invalid_file_is_rejected(): void
+    public function test_new_idempotency_key_requires_an_explicit_correction_and_invalid_file_is_rejected(): void
     {
         $admin = User::query()->where('email', 'admin@electcount.test')->firstOrFail();
         $eventTps = ElectionPollingStation::query()->with('election')->firstOrFail();
         $contest = $eventTps->election->contests()->with('participants')->firstOrFail();
 
-        foreach ([1, 2] as $version) {
-            $payload = $this->payload($eventTps, $contest, (string) Str::uuid(), [10 * $version, 20, 30]);
-            $payload += ['source_name' => 'Saksi TPS', 'source_method' => 'raw_photo'];
-            $payload['evidence'] = [UploadedFile::fake()->image("bukti-{$version}.webp", 1280, 960)];
-            $this->actingAs($admin)->post(route('reports.store'), $payload)->assertRedirect();
-        }
+        $first = $this->payload($eventTps, $contest, (string) Str::uuid(), [10, 20, 30]);
+        $first += ['source_name' => 'Saksi TPS', 'source_method' => 'raw_photo'];
+        $first['evidence'] = [UploadedFile::fake()->image('bukti-1.webp', 1280, 960)];
+        $this->actingAs($admin)->post(route('reports.store'), $first)->assertRedirect();
+        $original = VoteSubmission::query()->firstOrFail();
+
+        $second = $this->payload($eventTps, $contest, (string) Str::uuid(), [20, 20, 30]);
+        $second += ['source_name' => 'Saksi TPS', 'source_method' => 'raw_photo'];
+        $second['evidence'] = [UploadedFile::fake()->image('bukti-2.webp', 1280, 960)];
+        $this->actingAs($admin)->post(route('reports.store'), $second)->assertSessionHasErrors('correction_of_submission_id');
+        $this->assertDatabaseCount('vote_submissions', 1);
+
+        $second['correction_of_submission_id'] = $original->id;
+        $this->actingAs($admin)->post(route('reports.store'), $second)->assertRedirect();
 
         $this->assertSame([1, 2], VoteSubmission::query()->orderBy('version')->pluck('version')->all());
+        $this->assertDatabaseHas('vote_submissions', ['version' => 2, 'correction_of_submission_id' => $original->id]);
 
         $payload = $this->payload($eventTps, $contest, (string) Str::uuid(), [1, 1, 1]);
         $payload += ['source_name' => 'Saksi TPS', 'source_method' => 'raw_photo'];
+        $payload['correction_of_submission_id'] = VoteSubmission::query()->latest('version')->value('id');
         $payload['evidence'] = [UploadedFile::fake()->create('bukti.pdf', 20, 'application/pdf')];
         $this->actingAs($admin)->post(route('reports.store'), $payload)->assertSessionHasErrors('evidence.0');
         $this->assertDatabaseCount('vote_submissions', 2);

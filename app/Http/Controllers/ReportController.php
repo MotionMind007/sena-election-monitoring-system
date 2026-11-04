@@ -141,6 +141,17 @@ class ReportController extends Controller
         abort_unless($eventTps->election_id === $event->id && $scope->canAccessPollingStation($request->user(), $eventTps), 404);
         $contest = $event->contests->firstWhere('id', $request->integer('contest'));
         abort_unless($contest, 404);
+        $existingSubmission = VoteSubmission::query()
+            ->where('election_id', $event->id)
+            ->where('election_contest_id', $contest->id)
+            ->where('election_polling_station_id', $eventTps->id)
+            ->whereNot('status', SubmissionStatus::Draft->value)
+            ->latest('version')
+            ->first();
+        $correctionOf = $request->integer('correction');
+        if ($correctionOf) {
+            abort_unless($existingSubmission && $existingSubmission->id === $correctionOf, 404);
+        }
         $participants = $contest->participantsForDistrict($eventTps->pollingStation->region->parent_id);
 
         $draft = null;
@@ -154,6 +165,8 @@ class ReportController extends Controller
             'contest' => ['id' => $contest->id, 'name' => $contest->name, 'participants' => $participants],
             'station' => $this->stationData($eventTps),
             'draft' => $draft ? ['id' => $draft->id, 'idempotency_key' => $draft->idempotency_key, 'items' => $draft->items->map(fn ($item) => ['participant_id' => $item->contest_participant_id, 'votes' => $item->votes]), 'invalid_votes' => $draft->totals->invalid_votes, 'source_name' => $draft->source_name, 'source_method' => $draft->source_method, 'source_notes' => $draft->source_notes, 'evidence_count' => $draft->evidence->count()] : null,
+            'existingSubmission' => $existingSubmission ? ['id' => $existingSubmission->id, 'status' => $existingSubmission->status->value, 'version' => $existingSubmission->version] : null,
+            'correctionOf' => $correctionOf ?: null,
             'ocrSuggestion' => $draft ? $this->ocrSuggestion($draft, $participants->count()) : null,
             'isProxy' => ! $request->user()->hasRole(UserRole::Witness),
         ]);

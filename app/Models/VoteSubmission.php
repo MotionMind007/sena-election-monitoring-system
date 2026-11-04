@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['election_id', 'election_contest_id', 'election_polling_station_id', 'submitter_id', 'status', 'entry_mode', 'source_name', 'source_method', 'source_notes', 'idempotency_key', 'version', 'submitted_at'])]
+#[Fillable(['election_id', 'election_contest_id', 'election_polling_station_id', 'correction_of_submission_id', 'submitter_id', 'status', 'entry_mode', 'source_name', 'source_method', 'source_notes', 'idempotency_key', 'version', 'submitted_at'])]
 class VoteSubmission extends Model
 {
     protected function casts(): array
@@ -30,6 +30,11 @@ class VoteSubmission extends Model
     public function eventTps(): BelongsTo
     {
         return $this->belongsTo(ElectionPollingStation::class, 'election_polling_station_id');
+    }
+
+    public function correctionOf(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'correction_of_submission_id');
     }
 
     public function submitter(): BelongsTo

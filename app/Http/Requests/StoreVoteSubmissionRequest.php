@@ -22,6 +22,7 @@ class StoreVoteSubmissionRequest extends FormRequest
             'election_id' => ['required', 'integer', 'exists:elections,id'],
             'election_contest_id' => ['required', 'integer', 'exists:election_contests,id'],
             'election_polling_station_id' => ['required', 'integer', 'exists:election_polling_stations,id'],
+            'correction_of_submission_id' => ['nullable', 'integer', 'exists:vote_submissions,id'],
             'intent' => ['required', Rule::in(['draft', 'submit'])],
             'idempotency_key' => ['required', 'uuid'],
             'items' => ['required', 'array', 'min:1'],

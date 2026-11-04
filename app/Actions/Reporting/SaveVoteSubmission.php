@@ -94,6 +94,17 @@ class SaveVoteSubmission
                 }
 
                 if (! $submission) {
+                    $previous = VoteSubmission::query()
+                        ->where('election_id', $contest->election_id)
+                        ->where('election_contest_id', $contest->id)
+                        ->where('election_polling_station_id', $eventTps->id)
+                        ->whereNot('status', SubmissionStatus::Draft->value)
+                        ->orderByDesc('version')
+                        ->lockForUpdate()
+                        ->first();
+                    if ($previous && (int) ($data['correction_of_submission_id'] ?? 0) !== $previous->id) {
+                        throw ValidationException::withMessages(['correction_of_submission_id' => 'TPS ini sudah memiliki laporan. Buka laporan sebelumnya lalu pilih Ajukan koreksi.']);
+                    }
                     $version = ((int) VoteSubmission::query()
                         ->where('election_id', $contest->election_id)
                         ->where('election_contest_id', $contest->id)
@@ -105,6 +116,7 @@ class SaveVoteSubmission
                         'election_id' => $contest->election_id,
                         'election_contest_id' => $contest->id,
                         'election_polling_station_id' => $eventTps->id,
+                        'correction_of_submission_id' => $previous?->id,
                         'submitter_id' => $actor->id,
                         'status' => SubmissionStatus::Draft,
                         'entry_mode' => $actor->hasRole(UserRole::Witness) ? 'direct' : ($actor->hasRole(UserRole::Coordinator) ? 'coordinator_proxy' : 'admin_proxy'),
@@ -181,7 +193,7 @@ class SaveVoteSubmission
                 }
 
                 $this->audit->handle($actor, $data['intent'] === 'submit' ? 'vote_submission.submitted' : 'vote_submission.draft_saved', $submission, after: $submission->fresh()->toArray(), metadata: [
-                    'entry_mode' => $submission->entry_mode, 'source_method' => $submission->source_method, 'version' => $submission->version,
+                    'entry_mode' => $submission->entry_mode, 'source_method' => $submission->source_method, 'version' => $submission->version, 'correction_of_submission_id' => $submission->correction_of_submission_id,
                 ]);
 
                 return $submission->load(['items.participant', 'totals', 'evidence']);
