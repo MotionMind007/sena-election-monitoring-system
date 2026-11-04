@@ -94,7 +94,13 @@ const adminItems = [
                 </div>
             </header>
 
-            <main class="p-4 sm:p-6 lg:p-7"><slot /></main>
+            <main class="p-4 sm:p-6 lg:p-7">
+                <Transition name="page" mode="out-in" appear>
+                    <div :key="page.url" class="page-motion">
+                        <slot />
+                    </div>
+                </Transition>
+            </main>
         </div>
     </div>
 </template>
