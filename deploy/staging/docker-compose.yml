@@ -35,6 +35,9 @@ services:
 
   minio-init:
     image: staging-app:latest
+    build:
+      context: ../..
+      dockerfile: deploy/staging/Dockerfile
     depends_on:
       minio:
         condition: service_started
