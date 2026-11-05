@@ -82,7 +82,9 @@ services:
       context: ../..
       dockerfile: deploy/staging/Caddy.Dockerfile
     ports:
-      - "${STAGING_APP_PORT:-8080}:80"
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
     depends_on:
       app:
         condition: service_started
