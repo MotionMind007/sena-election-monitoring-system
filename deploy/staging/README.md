@@ -6,7 +6,7 @@ This Compose stack is disposable. It runs PostgreSQL, Redis, MinIO (S3-compatibl
 
 1. Copy `.env.staging.example` to `.env.staging.local` in this directory.
 2. Generate a unique Laravel app key with `php artisan key:generate --show` and set `APP_KEY`.
-3. Set unique local-only values for `STAGING_DB_PASSWORD`, `STAGING_MINIO_ACCESS_KEY`, and `STAGING_MINIO_SECRET_KEY`; copy the MinIO credentials into `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+3. Set unique local-only values for `STAGING_DB_PASSWORD`, `STAGING_MINIO_ACCESS_KEY`, and `STAGING_MINIO_SECRET_KEY`; copy `STAGING_DB_PASSWORD` into `DB_PASSWORD`, and copy the MinIO credentials into `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
 4. Run `docker compose --env-file .env.staging.local up --build` from this directory.
 5. Seed only synthetic P4 fixtures, run the guarded k6 scenarios, record results in `docs/PERFORMANCE.md`, then remove the stack with `docker compose --env-file .env.staging.local down -v`.
 
