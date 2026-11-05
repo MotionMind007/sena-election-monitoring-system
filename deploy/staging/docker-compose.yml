@@ -85,6 +85,9 @@ services:
       - "80:80"
       - "443:443"
       - "443:443/udp"
+    volumes:
+      - staging-caddy-data:/data
+      - staging-caddy-config:/config
     depends_on:
       app:
         condition: service_started
@@ -117,3 +120,5 @@ volumes:
   staging-postgres:
   staging-redis:
   staging-minio:
+  staging-caddy-data:
+  staging-caddy-config:
